@@ -1,0 +1,86 @@
+{
+  "final_model_performance": {
+    "test_rmse": 1.3835675561593164,
+    "test_r2": 0.9995888796501804
+  },
+  "optimization_results": {
+    "RandomForest_GridSearch": {
+      "best_params": {
+        "max_depth": null,
+        "max_features": null,
+        "min_samples_split": 2,
+        "n_estimators": 100
+      },
+      "best_cv_score": 4.365036795109229,
+      "train_rmse": 0.7082853053285754,
+      "test_rmse": 1.852938726291706,
+      "test_r2": 0.9992626217022517,
+      "optimization_time": 153.4690136909485
+    },
+    "GradientBoosting_GridSearch": {
+      "best_params": {
+        "learning_rate": 0.2,
+        "max_depth": 5,
+        "n_estimators": 100,
+        "subsample": 0.8
+      },
+      "best_cv_score": 9.998589395984371,
+      "train_rmse": 2.896263332540805,
+      "test_rmse": 3.1752058908049747,
+      "test_r2": 0.9978347302009688,
+      "optimization_time": 86.4960069656372
+    },
+    "DecisionTree_GridSearch": {
+      "best_params": {
+        "max_depth": null,
+        "max_features": null,
+        "min_samples_leaf": 2,
+        "min_samples_split": 5
+      },
+      "best_cv_score": 9.89317637045179,
+      "train_rmse": 1.0130943648888804,
+      "test_rmse": 2.8058219346291904,
+      "test_r2": 0.998309214762751,
+      "optimization_time": 3.4036448001861572
+    },
+    "RandomForest_RandomSearch": {
+      "best_params": {
+        "max_depth": 15,
+        "max_features": null,
+        "min_samples_leaf": 1,
+        "min_samples_split": 6,
+        "n_estimators": 283
+      },
+      "best_cv_score": 4.817740760690738,
+      "test_rmse": 1.9878996874583132,
+      "test_r2": 0.9991512942079592,
+      "optimization_time": 321.1265389919281
+    },
+    "GradientBoosting_RandomSearch": {
+      "best_params": {
+        "learning_rate": 0.06961470446025171,
+        "max_depth": 9,
+        "min_samples_split": 12,
+        "n_estimators": 130,
+        "subsample": 0.9134025858245949
+      },
+      "best_cv_score": 2.5367213646151763,
+      "test_rmse": 1.3835675561593164,
+      "test_r2": 0.9995888796501804,
+      "optimization_time": 186.12901735305786
+    }
+  },
+  "feature_columns": [
+    "large_ms",
+    "lf_ms",
+    "fare_low",
+    "distance_cat_encoded",
+    "nsmiles",
+    "combined_ms",
+    "fare_spread",
+    "fare"
+  ],
+  "target_column": "fare_lg",
+  "optimization_date": "2025-11-18T19:02:12.571142",
+  "best_model_name": "GradientBoosting_RandomSearch"
+}

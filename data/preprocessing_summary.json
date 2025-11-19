@@ -1,0 +1,19 @@
+{
+  "original_shape": [
+    245955,
+    23
+  ],
+  "cleaned_shape": [
+    176982,
+    23
+  ],
+  "rows_removed": 68973,
+  "percentage_retained": 71.95706531682625,
+  "columns_info": {
+    "numeric": 13,
+    "categorical": 10,
+    "total": 23
+  },
+  "missing_values": "0",
+  "memory_usage_mb": 34.55043315887451
+}

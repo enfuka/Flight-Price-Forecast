@@ -1,0 +1,37 @@
+{
+  "selected_features": [
+    "large_ms",
+    "lf_ms",
+    "fare_lg",
+    "fare_low",
+    "distance_cat_encoded",
+    "nsmiles",
+    "combined_ms",
+    "fare_spread"
+  ],
+  "target_variable": "fare",
+  "feature_selection_methods": [
+    "tree_importance",
+    "statistical",
+    "rfe"
+  ],
+  "dataset_shape": [
+    176982,
+    9
+  ],
+  "selection_date": "2025-11-18T18:47:22.139838",
+  "label_encoders": {
+    "distance_category": [
+      "long",
+      "medium",
+      "short"
+    ],
+    "route_popularity": [
+      "high",
+      "low",
+      "medium",
+      "very_high",
+      "very_low"
+    ]
+  }
+}
