@@ -1,13 +1,13 @@
 {
   "selected_features": [
-    "large_ms",
-    "lf_ms",
     "fare_lg",
-    "fare_low",
+    "lf_ms",
     "distance_cat_encoded",
+    "fare_low",
+    "fare_spread",
     "nsmiles",
-    "combined_ms",
-    "fare_spread"
+    "large_ms",
+    "combined_ms"
   ],
   "target_variable": "fare",
   "feature_selection_methods": [
@@ -19,7 +19,7 @@
     176982,
     9
   ],
-  "selection_date": "2025-11-18T18:47:22.139838",
+  "selection_date": "2025-11-28T18:29:09.864904",
   "label_encoders": {
     "distance_category": [
       "long",

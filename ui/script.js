@@ -114,10 +114,24 @@ class FlightPredictor {
     try {
       const formData = this.getFormData();
 
-      // Simulate API call - replace with actual model prediction
-      await this.simulateModelPrediction(formData);
+      // Call the actual ML model API
+      const response = await fetch("/api/predict", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
 
-      const prediction = this.generatePrediction(formData);
+      const result = await response.json();
+
+      if (result.status === "error") {
+        this.displayError(result.error || "Prediction failed");
+        return;
+      }
+
+      // Format the API response for display
+      const prediction = this.formatApiResponse(result, formData);
       this.displayResults(prediction);
     } catch (error) {
       console.error("Prediction error:", error);
@@ -125,6 +139,35 @@ class FlightPredictor {
     } finally {
       this.showLoading(false);
     }
+  }
+
+  formatApiResponse(result, formData) {
+    const fare = result.predicted_fare || 0;
+    const confidence = result.market_confidence || 75;
+    const fareClasses = result.fare_classes || {};
+    const marketAnalysis = result.market_analysis || {};
+
+    return {
+      price: Math.round(fare),
+      confidence: Math.round(confidence),
+      priceRange: {
+        low: Math.round(fareClasses.market_low || fare * 0.85),
+        high: Math.round(fareClasses.market_high || fare * 1.15),
+      },
+      fareClasses: {
+        economy: Math.round(fareClasses.economy || fare),
+        premium: Math.round(fareClasses.premium_economy || fare * 1.4),
+        business: Math.round(fareClasses.business || fare * 2.5),
+      },
+      recommendations: this.generateRecommendations(
+        formData,
+        fare,
+        marketAnalysis
+      ),
+      insights: this.generateInsights(formData, marketAnalysis),
+      routeInfo: result.route_info || {},
+      marketAnalysis: marketAnalysis,
+    };
   }
 
   getFormData() {
@@ -300,7 +343,7 @@ class FlightPredictor {
     return isPopularRoute ? 0.95 : 1.05; // Popular routes have more competition
   }
 
-  generateRecommendations(formData, predictedPrice) {
+  generateRecommendations(formData, predictedPrice, marketAnalysis) {
     const recommendations = [];
 
     if (formData.bookingAdvance < 30) {
@@ -331,12 +374,19 @@ class FlightPredictor {
       );
     }
 
+    // Add market-based recommendations
+    if (marketAnalysis.competition === "high") {
+      recommendations.push(
+        "🏆 High competition on this route - prices are competitive"
+      );
+    }
+
     recommendations.push("🔄 Set up price alerts to monitor fare changes");
 
     return recommendations;
   }
 
-  generateInsights(formData) {
+  generateInsights(formData, marketAnalysis) {
     const insights = [];
 
     const travelDate = new Date(formData.travelDate);
@@ -351,11 +401,18 @@ class FlightPredictor {
       );
     }
 
-    insights.push(
-      `📊 Historical data shows ${Math.floor(
-        Math.random() * 30 + 20
-      )}% price variation on this route`
-    );
+    // Add market analysis insights
+    if (marketAnalysis.route_type) {
+      insights.push(`📊 Route type: ${marketAnalysis.route_type}`);
+    }
+
+    if (marketAnalysis.season) {
+      insights.push(`🗓️ Season: ${marketAnalysis.season}`);
+    }
+
+    if (marketAnalysis.booking_timing) {
+      insights.push(`⏰ Booking timing: ${marketAnalysis.booking_timing}`);
+    }
 
     if (formData.bookingAdvance >= 42 && formData.bookingAdvance <= 56) {
       insights.push("🎯 You're in the optimal booking window!");
@@ -365,16 +422,18 @@ class FlightPredictor {
   }
 
   displayResults(prediction) {
+    const fareClasses = prediction.fareClasses || {};
+
     const resultsHTML = `
             <div class="price-prediction">
                 <h3>Predicted Flight Price</h3>
                 <div class="price-amount">$${prediction.price.toLocaleString()}</div>
                 <div class="price-range mt-2">
-                    <small>Expected range: $${prediction.priceRange.low.toLocaleString()} - $${prediction.priceRange.high.toLocaleString()}</small>
+                    <small>Market range: $${prediction.priceRange.low.toLocaleString()} - $${prediction.priceRange.high.toLocaleString()}</small>
                 </div>
                 <div class="confidence-meter">
                     <div class="d-flex justify-content-between align-items-center">
-                        <small>Confidence Level</small>
+                        <small>Model Confidence</small>
                         <small><strong>${
                           prediction.confidence
                         }%</strong></small>
@@ -385,8 +444,24 @@ class FlightPredictor {
                 </div>
             </div>
             
-            <div class="row">
-                <div class="col-md-6">
+            <div class="row mt-4">
+                <div class="col-md-4">
+                    <h5>💰 Fare Classes</h5>
+                    <ul class="list-unstyled">
+                        <li class="mb-2"><strong>Economy:</strong> $${(
+                          fareClasses.economy || prediction.price
+                        ).toLocaleString()}</li>
+                        <li class="mb-2"><strong>Premium:</strong> $${(
+                          fareClasses.premium ||
+                          Math.round(prediction.price * 1.4)
+                        ).toLocaleString()}</li>
+                        <li class="mb-2"><strong>Business:</strong> $${(
+                          fareClasses.business ||
+                          Math.round(prediction.price * 2.5)
+                        ).toLocaleString()}</li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
                     <h5>💡 Recommendations</h5>
                     <ul class="list-unstyled">
                         ${prediction.recommendations
@@ -394,7 +469,7 @@ class FlightPredictor {
                           .join("")}
                     </ul>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
                     <h5>📈 Market Insights</h5>
                     <ul class="list-unstyled">
                         ${prediction.insights
@@ -405,8 +480,8 @@ class FlightPredictor {
             </div>
             
             <div class="alert alert-info mt-3" role="alert">
-                <strong>Note:</strong> Predictions are based on historical flight data from 1993-2024. 
-                Actual prices may vary due to current market conditions, promotions, and availability.
+                <strong>Note:</strong> Predictions are based on our ML model trained on DOT airline market data (1993-2024). 
+                Actual prices may vary based on current availability and promotions.
             </div>
         `;
 

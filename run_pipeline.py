@@ -74,6 +74,10 @@ class FlightPricePipeline:
         self.models_dir = self.project_root / 'models'
         self.data_dir = self.project_root / 'data'
         self.ui_dir = self.project_root / 'ui'
+        
+        # Detect environment type
+        self.is_conda = self._detect_conda_env()
+        self.gpu_available = False
 
         # Notebook execution order
         self.notebooks = [
@@ -108,6 +112,47 @@ class FlightPricePipeline:
             ]
         }
 
+    def _detect_conda_env(self):
+        """Detect if running in a conda environment."""
+        conda_prefix = os.environ.get('CONDA_PREFIX')
+        conda_default = os.environ.get('CONDA_DEFAULT_ENV')
+        
+        if conda_prefix or conda_default:
+            env_name = conda_default or Path(conda_prefix).name
+            logger.info(f"{OK} Conda environment detected: {env_name}")
+            return True
+        else:
+            # Check if conda is available
+            try:
+                result = subprocess.run(['conda', '--version'], 
+                                       capture_output=True, text=True)
+                if result.returncode == 0:
+                    logger.info(f"{INFO} Conda available but not in conda environment")
+            except FileNotFoundError:
+                pass
+            return False
+
+    def _check_gpu_availability(self):
+        """Check if GPU is available for training."""
+        logger.info("Checking GPU availability...")
+        
+        # Check NVIDIA GPU
+        try:
+            result = subprocess.run(['nvidia-smi', '--query-gpu=name,memory.total', 
+                                    '--format=csv,noheader'],
+                                   capture_output=True, text=True)
+            if result.returncode == 0 and result.stdout.strip():
+                gpu_info = result.stdout.strip().split('\n')[0]
+                logger.info(f"{OK} NVIDIA GPU detected: {gpu_info}")
+                self.gpu_available = True
+                return True
+        except FileNotFoundError:
+            pass
+        
+        logger.info(f"{INFO} No NVIDIA GPU detected - will use CPU for training")
+        self.gpu_available = False
+        return False
+
     def setup_directories(self):
         """Create necessary directories if they don't exist."""
         logger.info("Setting up project directories...")
@@ -121,11 +166,14 @@ class FlightPricePipeline:
     def check_dependencies(self):
         """Check if required dependencies are installed and install them if missing."""
         logger.info("Checking dependencies...")
+        
+        # Check GPU availability first
+        self._check_gpu_availability()
 
-        # Package mapping for proper imports
+        # Core required packages (pip name -> import name)
         required_packages = {
             'jupyter': 'jupyter',
-            'nbconvert': 'nbconvert',  # Required for notebook execution
+            'nbconvert': 'nbconvert',
             'pandas': 'pandas',
             'numpy': 'numpy',
             'scikit-learn': 'sklearn',
@@ -134,73 +182,109 @@ class FlightPricePipeline:
             'plotly': 'plotly',
             'flask': 'flask',
             'flask-cors': 'flask_cors',
-            'joblib': 'joblib'
+            'joblib': 'joblib',
+            'python-dotenv': 'dotenv',
+            'google-generativeai': 'google.generativeai'
+        }
+        
+        # Optional GPU-accelerated packages
+        gpu_packages = {
+            'xgboost': 'xgboost',
+            'lightgbm': 'lightgbm'
         }
 
         missing_packages = []
+        missing_gpu_packages = []
 
-        # First pass: check what's missing
-        for display_name, import_name in required_packages.items():
+        # Check core packages
+        for pip_name, import_name in required_packages.items():
             try:
                 __import__(import_name)
-                logger.info(f"{OK} {display_name} is installed")
+                logger.info(f"{OK} {pip_name}")
             except ImportError:
-                missing_packages.append(display_name)
-                logger.warning(f"{WARNING} {display_name} is missing")
+                missing_packages.append(pip_name)
+                logger.warning(f"{WARNING} {pip_name} is missing")
 
-        # If packages are missing, try to install them automatically
-        if missing_packages:
-            logger.info(
-                f"{INFO} Attempting to install missing packages: {missing_packages}")
-
+        # Check GPU packages
+        for pip_name, import_name in gpu_packages.items():
             try:
-                # Install missing packages
-                install_cmd = [sys.executable, '-m',
-                               'pip', 'install'] + missing_packages
-                logger.info(f"{RUNNING} Installing packages...")
+                __import__(import_name)
+                logger.info(f"{OK} {pip_name}")
+            except ImportError:
+                missing_gpu_packages.append(pip_name)
+                logger.info(f"{INFO} {pip_name} not installed (optional)")
 
-                result = subprocess.run(
-                    install_cmd,
-                    capture_output=True,
-                    text=True,
-                    check=True
-                )
-
-                logger.info(f"{OK} Successfully installed packages!")
-
-                # Verify installation by checking imports again
-                still_missing = []
-                for display_name, import_name in required_packages.items():
-                    if display_name in missing_packages:
-                        try:
-                            __import__(import_name)
-                            logger.info(f"{OK} {display_name} now available")
-                        except ImportError:
-                            still_missing.append(display_name)
-
-                if still_missing:
-                    logger.error(f"{ERROR} Failed to install: {still_missing}")
-                    logger.info(
-                        f"{INFO} Please manually install: pip install " + " ".join(still_missing))
-                    return False
-
-                return True
-
-            except subprocess.CalledProcessError as e:
-                logger.error(
-                    f"{ERROR} Failed to install packages automatically")
-                logger.error(f"Error: {e.stderr}")
-                logger.info(
-                    f"{INFO} Please manually install: pip install " + " ".join(missing_packages))
+        # Handle missing packages based on environment type
+        if missing_packages:
+            if self.is_conda:
+                logger.warning(f"{WARNING} Missing packages in conda environment: {missing_packages}")
+                logger.info(f"{INFO} Please install missing packages with:")
+                logger.info(f"    conda install {' '.join(missing_packages)}")
+                logger.info(f"    Or: pip install {' '.join(missing_packages)}")
+                
+                # Try pip install as fallback in conda
+                try:
+                    response = input(f"Attempt to install missing packages with pip? (y/n): ").lower().strip()
+                    if response == 'y':
+                        return self._install_with_pip(missing_packages, required_packages)
+                except (EOFError, KeyboardInterrupt):
+                    pass
                 return False
-            except Exception as e:
-                logger.error(
-                    f"{ERROR} Unexpected error during installation: {e}")
-                logger.info(
-                    f"{INFO} Please manually install: pip install " + " ".join(missing_packages))
-                return False
+            else:
+                # Use pip for non-conda environments
+                return self._install_with_pip(missing_packages, required_packages)
+
+        # Report GPU package status
+        if self.gpu_available and missing_gpu_packages:
+            logger.info(f"{INFO} GPU detected but GPU-accelerated packages not installed:")
+            logger.info(f"    Consider: conda install {' '.join(missing_gpu_packages)}")
+            logger.info(f"    This will speed up model training significantly!")
 
         return True
+
+    def _install_with_pip(self, missing_packages, package_mapping):
+        """Install missing packages using pip."""
+        logger.info(f"{INFO} Attempting to install missing packages: {missing_packages}")
+
+        try:
+            install_cmd = [sys.executable, '-m', 'pip', 'install'] + missing_packages
+            logger.info(f"{RUNNING} Installing packages...")
+
+            result = subprocess.run(
+                install_cmd,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+
+            logger.info(f"{OK} Successfully installed packages!")
+
+            # Verify installation
+            still_missing = []
+            for pip_name in missing_packages:
+                import_name = package_mapping.get(pip_name, pip_name)
+                try:
+                    __import__(import_name)
+                    logger.info(f"{OK} {pip_name} now available")
+                except ImportError:
+                    still_missing.append(pip_name)
+
+            if still_missing:
+                logger.error(f"{ERROR} Failed to install: {still_missing}")
+                logger.info(f"{INFO} Please manually install: pip install " + " ".join(still_missing))
+                return False
+
+            return True
+
+        except subprocess.CalledProcessError as e:
+            logger.error(f"{ERROR} Failed to install packages automatically")
+            logger.error(f"Error: {e.stderr}")
+            logger.info(f"{INFO} Please manually install: pip install " + " ".join(missing_packages))
+            return False
+        except Exception as e:
+            logger.error(f"{ERROR} Unexpected error during installation: {e}")
+            logger.info(f"{INFO} Please manually install: pip install " + " ".join(missing_packages))
+            return False
 
     def check_dataset(self):
         """Check if the dataset file exists."""
@@ -288,16 +372,25 @@ class FlightPricePipeline:
             logger.info(f"{OK} {notebook_name} - All expected files created")
             return True
 
-    def run_all_notebooks(self):
-        """Execute all notebooks in sequence."""
+    def run_all_notebooks(self, start_from=1):
+        """Execute all notebooks in sequence, optionally starting from a specific notebook."""
         logger.info("="*60)
         logger.info("STARTING NOTEBOOK EXECUTION PIPELINE")
         logger.info("="*60)
 
+        if start_from > 1:
+            logger.info(f"{INFO} Starting from notebook {start_from}, skipping notebooks 1-{start_from-1}")
+
         start_time = time.time()
         successful_notebooks = 0
+        total_to_run = len(self.notebooks) - (start_from - 1)
 
         for i, notebook in enumerate(self.notebooks, 1):
+            # Skip notebooks before start_from
+            if i < start_from:
+                logger.info(f"[{i}/{len(self.notebooks)}] Skipping {notebook}")
+                continue
+
             logger.info(f"\n[{i}/{len(self.notebooks)}] Processing {notebook}")
 
             # Run notebook
@@ -331,16 +424,38 @@ class FlightPricePipeline:
         logger.info("NOTEBOOK EXECUTION SUMMARY")
         logger.info("="*60)
         logger.info(
-            f"Successfully executed: {successful_notebooks}/{len(self.notebooks)} notebooks")
+            f"Successfully executed: {successful_notebooks}/{total_to_run} notebooks")
         logger.info(f"Total execution time: {execution_time:.1f} seconds")
 
-        if successful_notebooks == len(self.notebooks):
+        if successful_notebooks == total_to_run:
             logger.info(f"{OK} All notebooks executed successfully!")
             return True
         else:
             logger.warning(
-                f"{WARNING} {len(self.notebooks) - successful_notebooks} notebooks failed")
-            return successful_notebooks >= 4  # Need at least data prep + model training
+                f"{WARNING} {total_to_run - successful_notebooks} notebooks failed")
+            return successful_notebooks >= 1  # At least one notebook succeeded
+
+    def run_single_notebook(self, notebook_num):
+        """Execute a single notebook by number (1-6)."""
+        if notebook_num < 1 or notebook_num > len(self.notebooks):
+            logger.error(f"{ERROR} Invalid notebook number: {notebook_num}")
+            return False
+
+        notebook = self.notebooks[notebook_num - 1]
+        logger.info("="*60)
+        logger.info(f"RUNNING SINGLE NOTEBOOK: {notebook}")
+        logger.info("="*60)
+
+        start_time = time.time()
+        success = self.run_notebook(notebook)
+
+        if success:
+            self.validate_outputs(notebook)
+            logger.info(f"{OK} {notebook} completed in {time.time() - start_time:.1f}s")
+        else:
+            logger.error(f"{ERROR} {notebook} failed")
+
+        return success
 
     def check_models_ready(self):
         """Check if trained models are available for the UI."""
@@ -469,10 +584,16 @@ def main():
         description='Flight Price Forecast Pipeline Runner')
     parser.add_argument('--skip-notebooks', action='store_true',
                         help='Skip notebook execution and launch UI directly')
+    parser.add_argument('--start-from', type=int, default=1, choices=[1, 2, 3, 4, 5, 6],
+                        help='Start from notebook N (1-6), skipping previous ones')
+    parser.add_argument('--only', type=int, default=None, choices=[1, 2, 3, 4, 5, 6],
+                        help='Run only notebook N (1-6)')
     parser.add_argument('--port', type=int, default=5000,
                         help='Port number for Flask app (default: 5000)')
     parser.add_argument('--project-root', type=str, default=None,
                         help='Project root directory (default: current directory)')
+    parser.add_argument('--no-ui', action='store_true',
+                        help='Skip launching the UI after notebooks')
 
     args = parser.parse_args()
 
@@ -493,21 +614,30 @@ def main():
 
     # Execute notebooks (unless skipped)
     if not args.skip_notebooks:
-        success = pipeline.run_all_notebooks()
+        if args.only:
+            # Run only a specific notebook
+            print(f"{INFO} Running only notebook {args.only}")
+            success = pipeline.run_single_notebook(args.only)
+        else:
+            # Run notebooks starting from specified index
+            success = pipeline.run_all_notebooks(start_from=args.start_from)
         if not success:
             print(
-                f"{WARNING} Notebook execution had issues, but continuing to UI launch...")
+                f"{WARNING} Notebook execution had issues, but continuing...")
     else:
         print(f"{INFO} Skipping notebook execution as requested")
 
     # Generate report
     pipeline.generate_report()
 
-    # Launch UI
-    try:
-        pipeline.launch_ui(args.port)
-    except KeyboardInterrupt:
-        print(f"\n{INFO} Pipeline execution completed!")
+    # Launch UI (unless --no-ui specified)
+    if not args.no_ui:
+        try:
+            pipeline.launch_ui(args.port)
+        except KeyboardInterrupt:
+            print(f"\n{INFO} Pipeline execution completed!")
+    else:
+        print(f"{INFO} Skipping UI launch as requested")
 
     return 0
 

@@ -1,6 +1,17 @@
 # Flight Price Forecast Project
 
-A comprehensive machine learning project for predicting airline ticket prices using historical flight data from 1993-2024. This project implements end-to-end data science methodology with interactive Jupyter notebooks and a user-friendly web interface.
+A comprehensive machine learning project for predicting airline ticket prices using historical flight data from 1993-2024. This project implements end-to-end data science methodology with interactive Jupyter notebooks, a user-friendly web interface, and an **AI-powered chatbot assistant using Google Gemini**.
+
+## NEW: AI Chat Assistant with Google Gemini
+
+This project now includes an intelligent LLM-powered chatbot that can:
+
+- Answer questions about flight prices in natural language
+- Provide personalized travel recommendations
+- Explain pricing trends and booking strategies
+- Make predictions through conversation
+
+**Quick Start (5 minutes - FREE):** See `GEMINI_SETUP.md` for step-by-step setup with Google's free Gemini API
 
 ## Project Overview
 
@@ -69,25 +80,52 @@ Flight Price Forecast/
 
 ## Quick Start
 
-### Automated Pipeline (Recommended)
+### Option 1: Conda Environment with GPU Support (Recommended)
 
-The fastest way to get started is using our automated pipeline scripts:
-
-#### Option 1: Complete Pipeline (Windows)
-
-```batch
-# Double-click to run, or in PowerShell/Command Prompt:
-run_pipeline.bat
-```
-
-#### Option 2: PowerShell Script (Windows)
+For the best performance, especially during model training, use the conda environment with GPU acceleration:
 
 ```powershell
-# Right-click → "Run with PowerShell", or:
+# Create the conda environment (includes GPU support if available)
+conda env create -f environment.yml
+
+# Activate the environment
+conda activate flight-forecast
+
+# Verify GPU is detected (optional)
+python -c "import xgboost; print('XGBoost ready')"
+
+# Run the complete pipeline
+python run_pipeline.py
+```
+
+**GPU Benefits:**
+
+- 🚀 XGBoost with CUDA: 5-10x faster training
+- 🚀 LightGBM with GPU: 3-5x faster training
+- Automatic fallback to CPU if GPU not available
+
+**No GPU?** Use the CPU-only environment:
+
+```powershell
+conda env create -f environment-cpu.yml
+conda activate flight-forecast
+```
+
+### Option 2: Automated Pipeline Scripts
+
+#### Windows PowerShell:
+
+```powershell
 .\run_pipeline.ps1
 ```
 
-#### Option 3: Python Script (Cross-platform)
+#### Windows Batch:
+
+```batch
+run_pipeline.bat
+```
+
+#### Cross-platform Python:
 
 ```bash
 # Run complete pipeline (notebooks + web app)
@@ -100,7 +138,7 @@ python run_pipeline.py --skip-notebooks
 python run_pipeline.py --port 8080
 ```
 
-#### Option 4: Quick Test (No Model Training)
+### Option 3: Quick Test (No Model Training)
 
 ```bash
 # Launch web app immediately with mock predictions
@@ -113,15 +151,24 @@ If you prefer to run components individually:
 
 #### 1. Setup Environment
 
+**Using Conda (Recommended for GPU support):**
+
+```bash
+conda env create -f environment.yml
+conda activate flight-forecast
+```
+
+**Using pip/venv (CPU only):**
+
 ```bash
 # Create virtual environment
-python -m venv flight_forecast_env
+python -m venv .venv
 
 # Activate environment
 # Windows:
-flight_forecast_env\Scripts\activate
+.venv\Scripts\activate
 # macOS/Linux:
-source flight_forecast_env/bin/activate
+source .venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
@@ -204,6 +251,7 @@ Our automation scripts provide:
 **Data Science**: Python, Pandas, NumPy, Scikit-learn, Matplotlib, Seaborn, Plotly
 **Machine Learning**: Decision Trees, Random Forests, Gradient Boosting, XGBoost
 **Web Framework**: Flask, HTML5, CSS3, JavaScript, Bootstrap
+**AI Integration**: Google Gemini (free tier available!)
 **Optimization**: GridSearchCV, RandomizedSearchCV, Scikit-optimize
 **Visualization**: Interactive charts, statistical plots, performance dashboards
 
@@ -223,6 +271,7 @@ See `requirements.txt` for complete list. Key libraries:
 - matplotlib, seaborn, plotly
 - flask, flask-cors
 - jupyter, ipykernel
+- google-generativeai (for AI chat)
 
 ## Usage Examples
 
@@ -259,6 +308,27 @@ features = prepare_flight_features(...)
 prediction = model.predict(scaler.transform(features))
 ```
 
+### AI Chat Assistant
+
+```python
+# Example chat interaction
+import requests
+
+# Ask the AI assistant about flight prices
+response = requests.post('http://localhost:5000/api/chat', json={
+    'message': 'What is the best time to book a flight from New York to Los Angeles?'
+})
+
+print(response.json()['response'])
+
+# Get personalized recommendations
+response = requests.post('http://localhost:5000/api/chat', json={
+    'message': 'I want to fly from Chicago to Miami in July. When should I book?'
+})
+```
+
+**Interactive Chat Widget**: Click the purple chat button on the web interface to talk with the AI assistant powered by Google Gemini in real-time!
+
 ## Documentation
 
 Each notebook contains detailed documentation including:
@@ -279,11 +349,15 @@ Each notebook contains detailed documentation including:
 
 ## Future Enhancements
 
+- ✅ **AI Chat Assistant**: IMPLEMENTED - Natural language interface with Google Gemini (free tier!)
 - **Real-time Data**: Integration with live flight APIs
 - **Advanced Models**: Deep learning and neural networks
 - **Multi-class Prediction**: Categorical price ranges
 - **Mobile App**: Native mobile application
 - **API Enhancement**: RESTful API with authentication
+- **Multi-language Support**: Add chat assistant support for multiple languages
+- **Voice Interface**: Voice-to-text chat interactions
+- **Personalized History**: Save user preferences and past searches
 
 ## Important Notes
 

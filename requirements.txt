@@ -29,6 +29,7 @@ flask-cors>=3.0.0
 # Utilities
 joblib>=1.1.0
 python-dateutil>=2.8.0
+python-dotenv>=0.19.0
 
 # Development and testing
 pytest>=6.0.0
@@ -37,3 +38,7 @@ black>=22.0.0
 # Optional: For advanced visualizations
 bokeh>=2.4.0
 dash>=2.0.0
+
+# AI Chat Assistant with Google Gemini
+# Get your free API key at: https://makersuite.google.com/app/apikey
+google-generativeai>=0.3.0
